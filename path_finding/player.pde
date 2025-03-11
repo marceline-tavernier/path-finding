@@ -7,7 +7,10 @@ float MASS = 10;
 
 ///////////////////////
 
+// The player and AI class
 class Player {
+
+  // Variables
   PVector position;
   PVector last_safe_position;
 
@@ -23,22 +26,24 @@ class Player {
   boolean left = false;
   boolean right = false;
 
+  // Constructor
   Player(PVector position, boolean isAI) {
     this.position = position;
     this.last_safe_position = new PVector(position.x, position.y);
     this.is_ai = isAI;
   }
 
+  // Draw the player as triangle and AI as rectangle to the right of the road
   void draw() {
     pushMatrix();
     translate(position.x, position.y);
     float angle = atan2(velocity.y, velocity.x);
     rotate(angle);
-    fill(255);
-    stroke(255);
+    fill(color(0, 250, 250));
+    stroke(color(0, 250, 250));
     if (is_ai) {
-      fill(color(250, 250, 50));
-      stroke(color(250, 250, 50));
+      fill(color(250, 250, 0));
+      stroke(color(250, 250, 0));
     }
     if (has_victim) {
       if ((millis() / 250) % 2 == 0) {
@@ -47,11 +52,16 @@ class Player {
         stroke(color(50, 100, 250));
       }
     }
-    triangle(12, 0, -8, 8, -8, -8);
+    if (is_ai) {
+      rect(-0.064 * map.cell_width, map.cell_height / 5, 0.192 * map.cell_width, 0.12 * map.cell_height);
+    } else {
+      triangle(12, 0, -8, 8, -8, -8);
+    }
     noStroke();
     popMatrix();
   }
 
+  // Handle key press and key release
   void keyPressed() {
     if (key == 'z') {
       up = true;
@@ -82,6 +92,7 @@ class Player {
     }
   }
 
+  // Handle collision and rollback if it's inside a wall
   void update_collision(Map map) {
     if (map.is_colliding(position)) {
       position.set(last_safe_position.copy());
@@ -90,6 +101,7 @@ class Player {
     }
   }
 
+  // Update values to move
   void update_values() {
     int vertical = 0;
     if (up && !down) {
@@ -108,6 +120,7 @@ class Player {
     move(new PVector(horizontal, vertical));
   }
 
+  // Move the player/AI
   void move(PVector direction) {
     desired_velocity = direction.normalize().mult(MAX_SPEED);
 
@@ -115,37 +128,62 @@ class Player {
     steering = desired_velocity.copy().sub(velocity);
     steering.limit(MAX_FORCE).div(MASS);
 
+    // If the angle between steering and current velocity is more than 135° (and is AI)
+    if (is_ai && PVector.angleBetween(steering, velocity) >= 0.75 * PI) {
+      float angle = -HALF_PI;
+
+      // Limit the steering angle and always the correct way
+      steering.lerp(PVector.fromAngle(angle).mult(steering.mag()).rotate(velocity.heading()), 0.5);
+    }
+
     // Update velocity and position
     velocity.add(steering).limit(MAX_SPEED);
     position.add(velocity);
-
-    map.update_map(this);
   }
 
-
+  // Update the path finding
   void update_path() {
+
+    // Update the map first to see if there is a victim to pick up
+    map.update_map(this);
+
     ArrayList<PVector> path = new ArrayList<PVector>();
+
+    // Get all victims and sort by distance
     ArrayList<PVector> victims = map.get_all_victims();
     victims.sort((a, b) ->
       Float.compare(map.heuristic(map.screen_to_grid(position), a), map.heuristic(map.screen_to_grid(position), b))
       );
-      
+
+    // If it has a victim or no victim left, go to the hospital
     if (has_victim || victims.size() == 0) {
       target_victim = new PVector(0, 0);
-      path = map.find_path(map.screen_to_grid(position), map.hospital_position);
-    } else {
-      if ((map.get_cell(target_victim).value != 'V') /*|| (map.get_cell(target_victim).value == 'V' && victims.get(0).dist(map.screen_to_grid(position)) < target_victim.dist(map.screen_to_grid(position)))*/) {
+      path = map.find_path(position, map.hospital_position);
+    }
+
+    // Else go to the closest one
+    else {
+      if (!map.get_cell(target_victim).has_victim) {
         target_victim = victims.get(0);
       }
-      path = map.find_path(map.screen_to_grid(position), target_victim);
+      path = map.find_path(position, target_victim);
     }
+
+    // If there is a path found
     if (path.size() > 0) {
-      followPath(path);
+
+      // If the cell is not occupied, follow the path
+      PVector next_cell = map.grid_to_screen(path.get(0));
+      PVector next_grid_position = map.screen_to_grid(next_cell);
+      if (!map.is_cell_occupied(next_grid_position, this)) {
+        follow_path(path);
+      }
     }
   }
 
-  void followPath(ArrayList<PVector> newPath) {
-    PVector target = map.grid_to_screen(newPath.get(0));
+  // Follow the path by moving to the first cell
+  void follow_path(ArrayList<PVector> path) {
+    PVector target = map.grid_to_screen(path.get(0));
     move(target.copy().sub(position));
   }
 }
