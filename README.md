@@ -2,7 +2,7 @@
 
 Artificial intelligence in games #2 : Path finding
 
-[Path finding video]()
+[Path finding video](https://github.com/user-attachments/assets/7f2f1549-726e-4d64-9dd4-95930ba1d47d)
 
 ## Description
 - Visualize the path finding of AIs (yellow rectangles)
