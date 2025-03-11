@@ -139,6 +139,9 @@ class Player {
     // Update velocity and position
     velocity.add(steering).limit(MAX_SPEED);
     position.add(velocity);
+    
+    // Update the map to see if there is a victim to pick up
+    map.update_map(this);
   }
 
   // Update the path finding
